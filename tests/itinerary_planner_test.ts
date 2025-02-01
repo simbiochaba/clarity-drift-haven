@@ -21,7 +21,6 @@ Clarinet.test({
     
     block.receipts[0].result.expectOk().expectBool(true);
     
-    // Verify provider status
     let query = chain.callReadOnlyFn(
       'itinerary_planner',
       'is-verified',
@@ -39,7 +38,6 @@ Clarinet.test({
     const deployer = accounts.get('deployer')!;
     const provider = accounts.get('wallet_1')!;
     
-    // First verify the provider
     chain.mineBlock([
       Tx.contractCall('itinerary_planner', 'verify-provider', [
         types.principal(provider.address)
@@ -51,14 +49,13 @@ Clarinet.test({
         types.utf8("Mountain Trek"),
         types.utf8("Amazing mountain trekking experience"),
         types.utf8("Nepal"),
-        types.uint(1000000), // 1 STX
+        types.uint(1000000),
         types.uint(10)
       ], provider.address)
     ]);
     
     block.receipts[0].result.expectOk().expectUint(0);
     
-    // Verify experience details
     let query = chain.callReadOnlyFn(
       'itinerary_planner',
       'get-experience',
@@ -71,13 +68,12 @@ Clarinet.test({
 });
 
 Clarinet.test({
-  name: "Ensure users can book experiences",
+  name: "Ensure users can book and review experiences",
   async fn(chain: Chain, accounts: Map<string, Account>) {
     const deployer = accounts.get('deployer')!;
     const provider = accounts.get('wallet_1')!;
     const user = accounts.get('wallet_2')!;
     
-    // Setup: Verify provider and create experience
     chain.mineBlock([
       Tx.contractCall('itinerary_planner', 'verify-provider', [
         types.principal(provider.address)
@@ -91,22 +87,40 @@ Clarinet.test({
       ], provider.address)
     ]);
     
-    let block = chain.mineBlock([
+    let bookBlock = chain.mineBlock([
       Tx.contractCall('itinerary_planner', 'book-experience', [
         types.uint(0)
       ], user.address)
     ]);
     
-    block.receipts[0].result.expectOk().expectBool(true);
+    bookBlock.receipts[0].result.expectOk().expectBool(true);
     
-    // Verify booking details
-    let query = chain.callReadOnlyFn(
+    let reviewBlock = chain.mineBlock([
+      Tx.contractCall('itinerary_planner', 'submit-review', [
+        types.uint(0),
+        types.uint(5),
+        types.utf8("Excellent experience!")
+      ], user.address)
+    ]);
+    
+    reviewBlock.receipts[0].result.expectOk().expectBool(true);
+    
+    let reviewQuery = chain.callReadOnlyFn(
       'itinerary_planner',
-      'get-booking',
+      'get-review',
       [types.uint(0), types.principal(user.address)],
       deployer.address
     );
     
-    assertEquals(query.result.expectSome().data.status, "booked");
+    assertEquals(reviewQuery.result.expectSome().data.rating, types.uint(5));
+    
+    let providerQuery = chain.callReadOnlyFn(
+      'itinerary_planner',
+      'get-provider-stats',
+      [types.principal(provider.address)],
+      deployer.address
+    );
+    
+    assertEquals(providerQuery.result.expectSome().data["total-reviews"], types.uint(1));
   }
 });
