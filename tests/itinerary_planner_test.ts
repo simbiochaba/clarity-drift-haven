@@ -25,3 +25,20 @@ Clarinet.test({
     block.receipts[0].result.expectErr().expectUint(107);
   }
 });
+
+Clarinet.test({
+  name: "Ensure review validation works correctly",
+  async fn(chain: Chain, accounts: Map<string, Account>) {
+    // Setup code...
+    
+    let block = chain.mineBlock([
+      Tx.contractCall('itinerary_planner', 'submit-review', [
+        types.uint(1),
+        types.uint(5),
+        types.utf8("Too short")
+      ], user.address)
+    ]);
+    
+    block.receipts[0].result.expectErr().expectUint(109);
+  }
+});
